@@ -6,6 +6,7 @@
 # load libraries --------------------------------------------------------------
 library(shiny)
 library(shinydashboard)
+library(plotly)
 library(ggplot2)
 library(dplyr)
 library(rlang)
@@ -200,14 +201,15 @@ make_scatter_plot <- function(data, input) {
     group_by(Fed) |> 
     summarize(
       player_count = n(),
-      average_elo = mean(!!sym(input$time)),
-      average_age = mean(Age),
+      average_elo = mean(!!sym(input$time), na.rm = TRUE),
+      average_age = mean(Age, na.rm = TRUE),
       has_top_players = factor(any(!!sym(input$time) > .highlight_elo))
     ) 
   
   plt <- ggplot(
     data, 
     aes(
+      Federation = Fed,
       x = average_elo, 
       y = average_age, 
       size = player_count,
@@ -219,7 +221,7 @@ make_scatter_plot <- function(data, input) {
       values = c('FALSE' = "grey40",
                  'TRUE' = 'green4')
     ) +
-    scale_size(range = c(1, 14), name = 'Player Count') +
+    scale_size(range = c(1, 10), name = 'Player Count') +
     labs(
       color = 'Has Top Performer'
     ) +
@@ -244,8 +246,8 @@ ui <- dashboardPage(
     ### menu ----
     sidebarMenu(
       menuItem(
-        'Elo Dashboard', 
-        tabName = 'tab_dash', 
+        'Elo Distributions', 
+        tabName = 'tab_dist', 
         icon = icon('pawn', lib = 'glyphicon')
       ),
       menuItem(
@@ -259,7 +261,7 @@ ui <- dashboardPage(
         icon = icon('king', lib = 'glyphicon')
       ),
       menuItem(
-        'Distributions', 
+        'Federation Snapshot', 
         tabName = 'tab_fed', 
         icon = icon('bishop', lib = 'glyphicon')
       )
@@ -294,16 +296,16 @@ ui <- dashboardPage(
       
       ### 1. Elo Dashboard ----
       tabItem(
-        tabName = 'tab_dash',
+        tabName = 'tab_dist',
         box(
           title = 'Distribution Plot', status = 'primary', solidHeader = TRUE,
-          plotOutput('distribution_plot', height = 350),
-          width = 8
+          plotlyOutput('distribution_plot', height = 350),
+          width = 9
         ),
         
         box(
           title = 'Inputs', status = 'warning', solidHeader = TRUE,
-          width = 4,
+          width = 3,
           
           # select grouping
           radioButtons(
@@ -352,7 +354,7 @@ ui <- dashboardPage(
           title = 'Federation Scatter Plot', 
           status = 'primary',
           solidHeader = TRUE,
-          plotOutput('federation_scatter_plot', height = 350),
+          plotlyOutput('federation_scatter_plot', height = 350),
           width = 8
         ),
         
@@ -407,14 +409,14 @@ server <- function(input, output) {
   )
   
   # add plots ----
-  output$distribution_plot <- renderPlot({
+  output$distribution_plot <- renderPlotly({
     make_dist_plot(
       data = data$dist_ratings_subset(),
       input = input
     )
   })
   
-  output$federation_scatter_plot <- renderPlot({
+  output$federation_scatter_plot <- renderPlotly({
     make_scatter_plot(
       data = data$ratings,
       input = input
