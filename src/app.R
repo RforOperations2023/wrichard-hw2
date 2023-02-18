@@ -7,12 +7,69 @@
 library(shiny)
 library(shinydashboard)
 library(ggplot2)
+library(dplyr)
 
 # load data -------------------------------------------------------------------
 ratings <- readRDS('ratings.Rds')
 # federations <- readRDS('federations.Rds')
 
 # data handling functions -----------------------------------------------------
+
+# define reactive function to subset data based on Byear range
+make_ratings_year_subset <- function(data, input) {
+  req(input$Byear_range) # make sure selected
+  data |> 
+    filter(
+      Byear >= input$Byear_range[[1]],
+      Byear <= input$Byear_range[[2]]
+    ) %>%
+    return()
+}
+
+# return data filtered
+make_country_subset <- function(data, input) {
+  # only filter if group is Fed
+  if (input$group == 'Fed') {
+    data <- data |> 
+      filter(
+        is.element(
+          Fed, input$fed_selected
+        )
+      ) 
+  }
+  
+  return(data)
+}
+
+# put it together
+make_data_subset <- function(data, input) {
+  data <- data |> 
+    make_ratings_year_subset(input = input) |>
+    make_country_subset(input = input)
+  
+  return(data)
+}
+
+get_top_ten <- function(data, input) {
+  top_ten_tbl <- data |> 
+    arrange(desc(!!sym(input$time))) |> 
+    head(10) 
+  
+  return(top_ten_tbl)
+}
+
+make_top_datatable <- function(top_ten) {
+  dt <- top_ten |> 
+    DT::datatable(
+      options = list(lengthChange = FALSE)
+    )
+  
+  return(dt)
+}
+
+
+
+# viz distribution functions --------------------------------------------------
 
 ## labels ----
 pretty_labels <- list(
@@ -31,7 +88,7 @@ make_dist_plot <- function(data, input) {
   .time = input$time
   .plot_type <- input$plot_type
   .group <- input$group
-  .bins <- input$bins
+  .bins <- 50
   .time <- input$time
   
   # save string of number of players
@@ -118,10 +175,6 @@ make_dist_plot <- function(data, input) {
 
 
 
-# viz distribution functions --------------------------------------------------
-
-
-
 
 
 # viz bubble functions --------------------------------------------------------
@@ -160,6 +213,18 @@ ui <- dashboardPage(
         tabName = 'tab_fed', 
         icon = icon('bishop', lib = 'glyphicon')
       )
+    ),
+    
+    # put here preference for type of ratings
+    # make it input
+    radioButtons(
+      inputId = 'time',
+      label = 'Time control:',
+      choices = c(
+        'Standard' = 'SRtng',
+        'Rapid' = 'RRtng',
+        'Bullet' = 'BRtng'
+      )
     )
   ),
   
@@ -170,19 +235,61 @@ ui <- dashboardPage(
       ### 1. Elo Dashboard ----
       tabItem(
         tabName = 'tab_dash',
-        h2('Distributions by federation / sex / etc from hw1'),
-        br(),
         box(
-          title = "Histogram", status = "primary", solidHeader = TRUE,
-          collapsible = TRUE,
-          textOutput('test_text')
+          title = 'Distribution Plot', status = 'primary', solidHeader = TRUE,
+          plotOutput('distribution_plot', height = 350),
+          width = 8
         ),
         
         box(
-          title = "Inputs", status = "warning", solidHeader = TRUE,
-          "Box content here", br(), "More box content",
-          sliderInput("slider", "Slider input:", 1, 100, 50),
-          textInput("text", "Text input:")
+          title = 'Inputs', status = 'warning', solidHeader = TRUE,
+          width = 4,
+
+          # birth year range
+          sliderInput(
+            inputId = 'Byear_range',
+            label = 'Birth year:',
+            min = 1910,
+            max = 2020,
+            value = c(1930, 2020),
+            sep = ''
+          ),
+          
+          # select grouping
+          radioButtons(
+            inputId = 'group',
+            label = 'Select grouping',
+            choices = c(
+              'Birth decade' = 'Bdecade',
+              'Sex' = 'Sex',
+              'Federation' = 'Fed',
+              'None' = 'None'
+            )
+          ),
+          
+          # select country if country is selected
+          conditionalPanel(
+            condition = "input.group == 'Fed'",
+            selectizeInput(
+              inputId = 'fed_selected',
+              label = 'Select Federations (max 7)',
+              choices = readRDS('federations.Rds'),
+              selected = c('USA', 'RUS', 'IND'),
+              multiple = TRUE,
+              options = list(maxItems = 7)
+            )
+          ),
+          
+          # graph type
+          radioButtons(
+            inputId = 'plot_type',
+            label = 'Select graph type',
+            choices = c(
+              'Histogram' = 'hist',
+              'Density Curve' = 'dens',
+              'Frequency Curve' = 'freq'
+            )
+          )
         )
       ),
       
@@ -217,14 +324,27 @@ server <- function(input, output) {
   data$ratings <- readRDS('ratings.Rds')
   data$federations <- readRDS('federations.Rds')
   
+  # add filter subset data for distribution tab
+  data$dist_ratings_subset <- reactive(
+    # from data_handling.R
+    make_data_subset(
+      data = data$ratings,
+      input = input
+    )
+  )
+  
   # add plot ----
   output$distribution_plot <- renderPlot({
-    ggplot(data$ratings, aes(x = SRtng, fill = 'Fed')) +
-      geom_histogram()
+    # from plots.R
+    make_dist_plot(
+      data = data$dist_ratings_subset(),
+      input = input
+    )
   })
   
   # test text
   output$test_text <- renderText('testing 123')
+  output$text <- renderText(input$text)
 }
 
 # run app ---------------------------------------------------------------------
