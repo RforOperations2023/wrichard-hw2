@@ -10,6 +10,7 @@ library(plotly)
 library(ggplot2)
 library(dplyr)
 library(rlang)
+library(DT)
 
 # load data -------------------------------------------------------------------
 ratings <- readRDS('ratings.Rds')
@@ -52,24 +53,22 @@ make_data_subset <- function(data, input) {
   return(data)
 }
 
-get_top_ten <- function(data, input) {
-  top_ten_tbl <- data |> 
+get_top_players <- function(data, input) {
+  top_tbl <- data |> 
     arrange(desc(!!sym(input$time))) |> 
-    head(10) 
+    head(100) 
   
-  return(top_ten_tbl)
+  return(top_tbl)
 }
 
-make_top_datatable <- function(top_ten) {
-  dt <- top_ten |> 
+make_top_datatable <- function(top_tbl) {
+  dt <- top_tbl |> 
     DT::datatable(
       options = list(lengthChange = FALSE)
     )
   
   return(dt)
 }
-
-
 
 # viz distribution functions --------------------------------------------------
 
@@ -169,10 +168,6 @@ make_dist_plot <- function(data, input) {
   return(plt)
 }
 
-
-
-
-
 # viz bubble functions --------------------------------------------------------
 
 make_scatter_plot <- function(data, input) {
@@ -259,11 +254,6 @@ ui <- dashboardPage(
         'Top Players', 
         tabName = 'tab_players', 
         icon = icon('king', lib = 'glyphicon')
-      ),
-      menuItem(
-        'Federation Snapshot', 
-        tabName = 'tab_fed', 
-        icon = icon('bishop', lib = 'glyphicon')
       )
     ),
     
@@ -378,13 +368,8 @@ ui <- dashboardPage(
       ### 3. Top Players ----
       tabItem(
         tabName = 'tab_players',
-        h2('data table of top players given certain filters?')
-      ),
-      
-      ### 4. Federation Detailed Summary ----
-      tabItem(
-        tabName = 'tab_fed',
-        h2('Federation details')
+        h2('data table of top players given certain filters?'),
+        dataTableOutput(outputId = 'dt')
       )
     )
   )
@@ -423,9 +408,16 @@ server <- function(input, output) {
     )
   })
   
-  # test text
-  output$test_text <- renderText('testing 123')
-  output$text <- renderText(input$text)
+  # get datatable
+  output$dt <- renderDataTable(
+    make_top_datatable(
+      get_top_players(
+        data$dist_ratings_subset(),
+        input
+      )
+    )
+  )
+  
 }
 
 # run app ---------------------------------------------------------------------
