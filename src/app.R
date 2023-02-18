@@ -12,10 +12,6 @@ library(dplyr)
 library(rlang)
 library(DT)
 
-# load data -------------------------------------------------------------------
-ratings <- readRDS('ratings.Rds')
-# federations <- readRDS('federations.Rds')
-
 # data handling functions -----------------------------------------------------
 
 # define reactive function to subset data based on Byear range
@@ -232,7 +228,7 @@ ui <- dashboardPage(
   
   ## header ----
   dashboardHeader(
-    title = 'Chess Dashboard v2'
+    title = 'Chess Dashboard HW2'
   ),
   
   ## sidebar ----
