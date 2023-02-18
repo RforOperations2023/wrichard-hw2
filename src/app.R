@@ -293,6 +293,8 @@ ui <- dashboardPage(
           width = 9
         ),
         
+        valueBoxOutput('dist_total', width = 3),
+        
         box(
           title = 'Inputs', status = 'warning', solidHeader = TRUE,
           width = 3,
@@ -362,7 +364,10 @@ ui <- dashboardPage(
             value = 2700,
             sep = ''
           )
-        )
+        ),
+        
+        valueBoxOutput('v_fed_total'),
+        valueBoxOutput('v_fed_highlight')
       ),
       
       ### 3. Top Players ----
@@ -420,6 +425,50 @@ server <- function(input, output) {
       )
     )
   )
+  
+  # get values for boxes
+  # federations total
+  output$v_fed_total <- renderValueBox({
+    n_fed <- data$dist_ratings_subset() |> 
+      select(Fed) |> 
+      table() |> 
+      names() |> 
+      length()
+    
+    valueBox(
+      n_fed, 
+      'Total Federations Shown', 
+      icon = icon('globe', lib = 'glyphicon')
+    )
+  })
+  
+  # federations highlighted
+  output$v_fed_highlight <- renderValueBox({
+    n_highlight <- data$dist_ratings_subset() |> 
+      group_by(Fed) |> 
+      summarize(
+        has_top_player = any(!!sym('SRtng') > input$highlight_elo)
+      ) |> summarize(n = sum(has_top_player))
+    
+    valueBox(
+      n_highlight, 
+      'Total Federations Highlighted', 
+      icon = icon('star', lib = 'glyphicon')
+    )
+  })
+  
+  # distribution total 
+  output$dist_total <- renderValueBox({
+    n_dist <- data$dist_ratings_subset() |> 
+      nrow()
+    
+    valueBox(
+      n_dist, 
+      'Total Players Shown', 
+      icon = icon('user', lib = 'glyphicon')
+    )
+  })
+  
   
 }
 
