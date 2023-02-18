@@ -101,11 +101,6 @@ make_dist_plot <- function(data, input) {
   plot_settings <- list(
     theme_classic(),
     labs(
-      subtitle = paste(
-        'This plot shows data on',
-        player_count_string,
-        'players'
-      ),
       caption = 'Data: FIDE, January 2023\nViz: @bristowrichards'
     ),
     xlab(pretty_labels[.time]),
@@ -194,11 +189,6 @@ make_scatter_plot <- function(data, input) {
   plot_settings <- list(
     theme_classic(),
     labs(
-      subtitle = paste(
-        'This plot shows data on',
-        player_count_string,
-        'players'
-      ),
       caption = 'Data: FIDE, January 2023\nViz: @bristowrichards'
     ),
     xlab(paste('Average', pretty_labels[.time])),
@@ -206,7 +196,7 @@ make_scatter_plot <- function(data, input) {
   )
   
   # data
-  data <- data |> 
+  data <- make_ratings_year_subset(data, input) |> 
     group_by(Fed) |> 
     summarize(
       player_count = n(),
@@ -227,34 +217,18 @@ make_scatter_plot <- function(data, input) {
     geom_point(alpha = 0.7) +
     scale_color_manual(
       values = c('FALSE' = "grey40",
-                 'TRUE' = 'red')
+                 'TRUE' = 'green4')
     ) +
+    scale_size(range = c(1, 14), name = 'Player Count') +
     labs(
-      color = 'Top Performer',
-      size = 'Federation Player Count'
+      color = 'Has Top Performer'
     ) +
+    ylab('Average Age') +
     plot_settings
   
   return(plt)
     
 }
-
-# 
-# ratings |> 
-#   group_by(Fed) |> 
-#   summarize(
-#     player_count = n(),
-#     average_elo = mean(SRtng),
-#     average_age = mean(Age),
-#     has_top_players = factor(any(SRtng > 2700), levels = c(FALSE, TRUE))
-#   ) |> 
-#   ggplot(aes(x = average_elo, y = average_age, 
-#              size = player_count, color = has_top_players)) +
-#   geom_point(alpha = 0.7)
-
-
-
-
 
 # define ui -------------------------------------------------------------------
 ui <- dashboardPage(
@@ -301,6 +275,16 @@ ui <- dashboardPage(
         'Rapid' = 'RRtng',
         'Bullet' = 'BRtng'
       )
+    ),
+    
+    # birth year range
+    sliderInput(
+      inputId = 'Byear_range',
+      label = 'Birth year:',
+      min = 1910,
+      max = 2020,
+      value = c(1930, 2020),
+      sep = ''
     )
   ),
   
@@ -320,16 +304,6 @@ ui <- dashboardPage(
         box(
           title = 'Inputs', status = 'warning', solidHeader = TRUE,
           width = 4,
-
-          # birth year range
-          sliderInput(
-            inputId = 'Byear_range',
-            label = 'Birth year:',
-            min = 1910,
-            max = 2020,
-            value = c(1930, 2020),
-            sep = ''
-          ),
           
           # select grouping
           radioButtons(
@@ -395,7 +369,7 @@ ui <- dashboardPage(
             max = 2800,
             value = 2700,
             sep = ''
-          ),
+          )
         )
       ),
       
@@ -426,7 +400,6 @@ server <- function(input, output) {
   
   # add filter subset data for distribution tab
   data$dist_ratings_subset <- reactive(
-    # from data_handling.R
     make_data_subset(
       data = data$ratings,
       input = input
