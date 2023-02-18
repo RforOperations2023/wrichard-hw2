@@ -8,6 +8,7 @@ library(shiny)
 library(shinydashboard)
 library(ggplot2)
 library(dplyr)
+library(rlang)
 
 # load data -------------------------------------------------------------------
 ratings <- readRDS('ratings.Rds')
@@ -85,7 +86,6 @@ pretty_labels <- list(
 ## distributions plots ----
 make_dist_plot <- function(data, input) {
   # save options for easy access
-  .time = input$time
   .plot_type <- input$plot_type
   .group <- input$group
   .bins <- 50
@@ -178,6 +178,82 @@ make_dist_plot <- function(data, input) {
 
 
 # viz bubble functions --------------------------------------------------------
+
+make_scatter_plot <- function(data, input) {
+  # save options for easy access
+  .time <- input$time
+  .highlight_elo <- input$highlight_elo
+  
+  # save string of number of players
+  player_count_string <- 
+    scales::comma_format()(
+      nrow(data)
+    )
+  
+  # settings for all
+  plot_settings <- list(
+    theme_classic(),
+    labs(
+      subtitle = paste(
+        'This plot shows data on',
+        player_count_string,
+        'players'
+      ),
+      caption = 'Data: FIDE, January 2023\nViz: @bristowrichards'
+    ),
+    xlab(paste('Average', pretty_labels[.time])),
+    theme(plot.title = element_text(size=18))
+  )
+  
+  # data
+  data <- data |> 
+    group_by(Fed) |> 
+    summarize(
+      player_count = n(),
+      average_elo = mean(!!sym(input$time)),
+      average_age = mean(Age),
+      has_top_players = factor(any(!!sym(input$time) > .highlight_elo))
+    ) 
+  
+  plt <- ggplot(
+    data, 
+    aes(
+      x = average_elo, 
+      y = average_age, 
+      size = player_count,
+      color = has_top_players
+    )
+  ) + 
+    geom_point(alpha = 0.7) +
+    scale_color_manual(
+      values = c('FALSE' = "grey40",
+                 'TRUE' = 'red')
+    ) +
+    labs(
+      color = 'Top Performer',
+      size = 'Federation Player Count'
+    ) +
+    plot_settings
+  
+  return(plt)
+    
+}
+
+# 
+# ratings |> 
+#   group_by(Fed) |> 
+#   summarize(
+#     player_count = n(),
+#     average_elo = mean(SRtng),
+#     average_age = mean(Age),
+#     has_top_players = factor(any(SRtng > 2700), levels = c(FALSE, TRUE))
+#   ) |> 
+#   ggplot(aes(x = average_elo, y = average_age, 
+#              size = player_count, color = has_top_players)) +
+#   geom_point(alpha = 0.7)
+
+
+
 
 
 # define ui -------------------------------------------------------------------
@@ -296,7 +372,31 @@ ui <- dashboardPage(
       ### 2. Scatter Plot ----
       tabItem(
         tabName = 'tab_scatter',
-        h2('scatter plot (bubble plot?) of all federations')
+        
+        # show plot
+        box(
+          title = 'Federation Scatter Plot', 
+          status = 'primary',
+          solidHeader = TRUE,
+          plotOutput('federation_scatter_plot', height = 350),
+          width = 8
+        ),
+        
+        # inputs
+        box(
+          title = 'Inputs', status = 'warning', solidHeader = TRUE,
+          width = 4,
+          
+          # birth year range
+          sliderInput(
+            inputId = 'highlight_elo',
+            label = 'Highlight federations with players above:',
+            min = 1000,
+            max = 2800,
+            value = 2700,
+            sep = ''
+          ),
+        )
       ),
       
       ### 3. Top Players ----
@@ -333,11 +433,17 @@ server <- function(input, output) {
     )
   )
   
-  # add plot ----
+  # add plots ----
   output$distribution_plot <- renderPlot({
-    # from plots.R
     make_dist_plot(
       data = data$dist_ratings_subset(),
+      input = input
+    )
+  })
+  
+  output$federation_scatter_plot <- renderPlot({
+    make_scatter_plot(
+      data = data$ratings,
       input = input
     )
   })
