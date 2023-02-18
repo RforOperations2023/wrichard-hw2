@@ -368,7 +368,10 @@ ui <- dashboardPage(
       ### 3. Top Players ----
       tabItem(
         tabName = 'tab_players',
-        h2('data table of top players given certain filters?'),
+        h2('Top Players'),
+        h4(paste('This table contains the highest rated players, ',
+                 'filtered by your input and arranged by your ',
+                 'time control selection')),
         dataTableOutput(outputId = 'dt')
       )
     )
